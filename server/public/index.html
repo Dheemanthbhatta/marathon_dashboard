@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Marathon Registration</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <h1>Register Runner</h1>
+  <form id="runnerForm">
+    <input type="text" name="name" placeholder="Name" required />
+    <input type="text" name="bibNumber" placeholder="Bib Number" required />
+    <input type="text" name="city" placeholder="City" />
+    <label>Sponsors:</label><br/>
+    <input type="text" name="sponsors" placeholder="Comma-separated sponsors (e.g. Nike, Puma)" /><br/>
+    <label>Categories:</label><br/>
+    <select name="categories" multiple>
+      <option value="5K">5K</option>
+      <option value="10K">10K</option>
+      <option value="Half Marathon">Half Marathon</option>
+      <option value="Full Marathon">Full Marathon</option>
+    </select><br/>
+    <label>Start Time:</label>
+    <input type="time" name="startTime" />
+    <label>End Time:</label>
+    <input type="time" name="endTime" />
+    <label><input type="checkbox" name="didFinish" /> Finished</label>
+    <label><input type="checkbox" name="medalReceived" /> Medal</label>
+    <label><input type="checkbox" name="certificateReceived" /> Certificate</label>
+    <label>Refreshment Stalls:</label><br/>
+    <input type="text" name="refreshmentStalls" placeholder="Comma-separated stalls (e.g. Water, Fruit, EnergyBar)" /><br/>
+    <button type="submit">Submit</button>
+  </form>
+
+  <!-- ✅ Run a Query -->
+  <h2>Run a Query</h2>
+
+  <!-- Dropdown Queries -->
+  <select id="querySelector">
+    <option value="full-marathon-finishers">Full Marathon Finishers</option>
+    <option value="medal-winners">Medal Winners</option>
+    <option value="certificate-receivers">Certificate Receivers</option>
+    <option value="completion-rate-by-city">Completion Rate by City</option>
+    <option value="top-completion-cities">Top 3 Cities by Completion Rate</option>
+    <option value="fastest-by-category">Fastest Runner by Category</option>
+  </select>
+  <button onclick="runQuery()">Run Query</button>
+
+  <br/><br/>
+  <input type="text" id="cityInput" placeholder="Enter city name" />
+  <button onclick="runCityQuery()">Search by City</button>
+
+  <!-- ✅ Tab Buttons -->
+  <div class="tabs">
+    <button onclick="showTab('performance')">Performance</button>
+    <button onclick="showTab('sponsors')">Sponsors</button>
+    <button onclick="showTab('refreshments')">Refreshments</button>
+  </div>
+
+  <!-- ✅ Tab Content Sections -->
+  <div id="performance" class="tab-content">
+    <button id="showNonFinishers">Show Non-Finishers</button>
+    <div id="nonFinishersList"></div>
+
+    <button id="showAverageTime">Show Average Completion Time</button>
+    <div id="averageTimeList"></div>
+
+    <button id="showTopHalfMarathon">Show Top 3 Half Marathon Finishers</button>
+    <div id="topHalfMarathonList"></div>
+    <button id="showPopularCategories">Show Popular Categories</button>
+    <div id="popularCategoriesList"></div>
+    <button id="showBetterThanAverage">Show Runners Better Than Average</button>
+    <div id="betterThanAverageList"></div>
+    <button id="showTopParticipationCities">Show Top Participation Cities</button>
+    <div id="topParticipationCitiesList"></div>
+
+  </div>
+
+  <div id="sponsors" class="tab-content" style="display:none;">
+    <button id="showMultiSponsors">Show Multi-Category Sponsors</button>
+    <div id="multiSponsorsList"></div>
+
+    <button id="showMultiCategoryRunners">Show Multi-Category Runners</button>
+    <div id="multiCategoryRunnersList"></div>
+  </div>
+
+  <div id="refreshments" class="tab-content" style="display:none;">
+    <button id="showPopularStalls">Show Popular Refreshment Stalls</button>
+    <div id="popularStallsList"></div>
+    <canvas id="stallChart" width="400" height="200"></canvas>
+  </div>
+
+  <!-- ✅ Optional Result Display -->
+  <pre id="result"></pre>
+  <canvas id="chartCanvas" width="100" height="80"></canvas>
+
+  <!-- ✅ Scripts -->
+<script src="main.js"></script>
+
+<script>
+  function showTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(div => div.style.display = 'none');
+    document.getElementById(tabId).style.display = 'block';
+  }
+
+  document.getElementById('runnerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
+    data.sponsors = data.sponsors ? data.sponsors.split(',').map(s => s.trim()) : [];
+    data.refreshmentStalls = data.refreshmentStalls ? data.refreshmentStalls.split(',').map(s => s.trim()) : [];
+    data.categories = Array.from(formData.getAll('categories'));
+    data.didFinish = formData.has('didFinish');
+    data.medalReceived = formData.has('medalReceived');
+    data.certificateReceived = formData.has('certificateReceived');
+
+    const response = await fetch('/api/runners', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    alert(result.message || 'Runner submitted!');
+    e.target.reset();
+  });
+
+  document.getElementById('showNonFinishers').addEventListener('click', async () => {
+    const res = await fetch('/api/runners/did-not-finish');
+    const data = await res.json();
+    const list = document.getElementById('nonFinishersList');
+    list.innerHTML = data.length ? data.map(r => `<div><strong>${r.name}</strong> (Bib: ${r.bibNumber})<br>City: ${r.city}<br>Categories: ${r.categories.join(', ')}</div><br>`).join('') : '<p>No non-finishers found.</p>';
+  });
+
+  document.getElementById('showAverageTime').addEventListener('click', async () => {
+    const res = await fetch('/api/runners/average-time-by-category');
+    const data = await res.json();
+    const list = document.getElementById('averageTimeList');
+    list.innerHTML = data.length ? data.map(item => `<div><strong>${item.category}</strong>: ${item.averageTime} minutes</div>`).join('') : '<p>No data available.</p>';
+  });
+
+  document.getElementById('showTopHalfMarathon').addEventListener('click', async () => {
+    const res = await fetch('/api/runners/top-3-half-marathon');
+    const data = await res.json();
+    const list = document.getElementById('topHalfMarathonList');
+    list.innerHTML = data.length ? data.map((r, i) => `<div><strong>#${i + 1} ${r.name}</strong> (Bib: ${r.bibNumber})<br>City: ${r.city}<br>Finish Time: ${r.finishTime} minutes</div><br>`).join('') : '<p>No finishers found for Half Marathon.</p>';
+  });
+
+  document.getElementById('showMultiSponsors').addEventListener('click', async () => {
+    const res = await fetch('/api/runners/multi-category-sponsors');
+    const data = await res.json();
+    const list = document.getElementById('multiSponsorsList');
+    list.innerHTML = data.length ? data.map(s => `<div><strong>${s.sponsor}</strong><br>Categories: ${s.categories.join(', ')}<br>Supported ${s.categoryCount} categories</div><br>`).join('') : '<p>No sponsors found supporting multiple categories.</p>';
+  });
+
+  document.getElementById('showMultiCategoryRunners').addEventListener('click', async () => {
+    const res = await fetch('/api/runners/multi-category-runners');
+    const data = await res.json();
+    const list = document.getElementById('multiCategoryRunnersList');
+    list.innerHTML = data.length ? data.map(r => `<div><strong>${r.name}</strong> (Bib: ${r.bibNumber})<br>City: ${r.city}<br>Categories: ${r.categories.join(', ')}</div><br>`).join('') : '<p>No runners found in multiple categories.</p>';
+  });
+
+  let stallChartInstance = null;
+  document.getElementById('showPopularStalls').addEventListener('click', async () => {
+    try {
+      const response = await fetch('/api/runners/popular-stalls');
+      const data = await response.json();
+
+      const list = document.getElementById('popularStallsList');
+      list.innerHTML = '';
+
+      if (data.length === 0) {
+        list.innerHTML = '<p>No stalls visited by more than 50 runners.</p>';
+        if (stallChartInstance) stallChartInstance.destroy();
+        return;
+      }
+
+      data.forEach(stall => {
+        const item = document.createElement('div');
+        item.innerHTML = `<strong>${stall.stall}</strong>: ${stall.runnerCount} runners<br><br>`;
+        list.appendChild(item);
+      });
+
+      const ctx = document.getElementById('stallChart').getContext('2d');
+      if (stallChartInstance) stallChartInstance.destroy();
+      stallChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(s => s.stall),
+          datasets: [{
+            label: 'Runner Count',
+            data: data.map(s => s.runnerCount),
+            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 10 }
+            }
+          }
+        }
+      });
+
+    } catch (err) {
+      console.error('Error fetching popular stalls:', err);
+      document.getElementById('popularStallsList').innerHTML = '<p>Error loading data.</p>';
+    }
+  });
+</script>
+<script>
+document.getElementById('showPopularCategories').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/runners/popular-categories');
+    const data = await response.json();
+    const list = document.getElementById('popularCategoriesList');
+    list.innerHTML = '';
+
+    if (data.length === 0) {
+      list.innerHTML = '<p>No categories with more than 200 runners.</p>';
+      return;
+    }
+
+    data.forEach(cat => {
+      const item = document.createElement('div');
+      item.innerHTML = `<strong>${cat._id}</strong>: ${cat.count} runners<br><br>`;
+      list.appendChild(item);
+    });
+  } catch (err) {
+    console.error('Error fetching popular categories:', err);
+    document.getElementById('popularCategoriesList').innerHTML = '<p>Error loading data.</p>';
+  }
+});
+</script>
+<script>
+document.getElementById('showBetterThanAverage').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/runners/better-than-average');
+    const data = await response.json();
+    const list = document.getElementById('betterThanAverageList');
+    list.innerHTML = '';
+
+    if (data.length === 0) {
+      list.innerHTML = '<p>No runners found with better-than-average times.</p>';
+      return;
+    }
+
+    data.forEach(runner => {
+      const item = document.createElement('div');
+      item.innerHTML = `
+        <strong>${runner.name}</strong> (Bib: ${runner.bibNumber})<br>
+        City: ${runner.city}<br>
+        Category: ${runner.category}<br>
+        Finish Time: ${runner.finishTime} minutes<br><br>
+      `;
+      list.appendChild(item);
+    });
+  } catch (err) {
+    console.error('Error fetching better-than-average runners:', err);
+    document.getElementById('betterThanAverageList').innerHTML = '<p>Error loading data.</p>';
+  }
+});
+</script>
+<script>
+document.getElementById('showTopParticipationCities').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/runners/top-participation-cities');
+    const data = await response.json();
+    const list = document.getElementById('topParticipationCitiesList');
+    list.innerHTML = '';
+
+    if (data.length === 0) {
+      list.innerHTML = '<p>No city data available.</p>';
+      return;
+    }
+
+    data.forEach(city => {
+      const item = document.createElement('div');
+      item.innerHTML = `<strong>${city.city}</strong>: ${city.participantCount} participants<br><br>`;
+      list.appendChild(item);
+    });
+  } catch (err) {
+    console.error('Error fetching top participation cities:', err);
+    document.getElementById('topParticipationCitiesList').innerHTML = '<p>Error loading data.</p>';
+  }
+});
+</script>
+</body>
+</html>
