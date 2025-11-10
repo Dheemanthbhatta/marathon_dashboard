@@ -1,0 +1,21 @@
+<!-- client/index.html -->
+<html>
+<head><title>Marathon Dashboard</title></head>
+<body>
+  <h1>Runners</h1>
+  <ul id="runnerList"></ul>
+
+  <script>
+    fetch("https://marathon-dash-vdkt.onrender.com/api/runners")
+      .then(res => res.json())
+      .then(data => {
+        const list = document.getElementById("runnerList");
+        data.forEach(runner => {
+          const item = document.createElement("li");
+          item.textContent = `${runner.name} - ${runner.time}`;
+          list.appendChild(item);
+        });
+      });
+  </script>
+</body>
+</html>
